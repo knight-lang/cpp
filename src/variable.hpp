@@ -9,7 +9,7 @@ namespace kn {
 	//
 	// As per the Knight specs, all variables are global.
 	class Variable {
-		// The name of the variable.
+		// The name of the variable. This cannot be changed.
 		std::string const name;
 
 		// The value associated with this variable.
