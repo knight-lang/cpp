@@ -1,5 +1,5 @@
 #include "variable.hpp"
-#include <unordered_map>
+#include "robin_hood_map.hpp"
 #include <iostream>
 #include <memory>
 
@@ -8,7 +8,7 @@ using namespace kn;
 Variable::Variable(std::string name) noexcept : name(name) {}
 
 // The set of all known variables.
-static std::unordered_map<std::string_view, std::shared_ptr<Variable>> ENVIRONMENT;
+static robin_hood::unordered_map<std::string_view, std::shared_ptr<Variable>> ENVIRONMENT;
 
 std::optional<Value> Variable::parse(std::string_view& view) {
 	char front = view.front();

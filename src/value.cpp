@@ -107,29 +107,32 @@ bool Value::to_boolean() {
 	}, data);
 }
 
+
+static number string_to_number(string const& str) {
+	// a custom `stroll` that will will just stop at the first invalid character
+	number ret = 0;
+	auto begin = std::find_if_not(str.cbegin(), str.cend(), [](char c) { return std::isspace(c); });
+
+	if (begin == str.cend())
+		return (number) 0;
+
+	int sign = (*begin == '-') ? -1 : 1;
+
+	if (*begin == '-' || *begin == '+')
+		++begin;
+
+	for (; begin != str.cend() && std::isdigit(*begin); ++begin)
+		ret = ret * 10 + (*begin - '0');
+
+	return ret * sign;
+}
+
 number Value::to_number() {
 	return std::visit(overload {
 		[](null) { return (number) 0; },
 		[](bool boolean) { return (number) boolean; },
 		[](number num) { return num; },
-		[](shared_ptr<string> const& str) {
-			// a custom `stroll` that will will just stop at the first invalid character
-			number ret = 0;
-			auto begin = std::find_if_not(str->cbegin(), str->cend(), [](char c) { return std::isspace(c); });
-
-			if (begin == str->cend())
-				return (number) 0;
-
-			int sign = (*begin == '-') ? -1 : 1;
-
-			if (*begin == '-' || *begin == '+')
-				++begin;
-
-			for (; begin != str->cend() && std::isdigit(*begin); ++begin)
-				ret = ret * 10 + (*begin - '0');
-
-			return ret * sign;
-		},
+		[](shared_ptr<string> const& str) { return string_to_number(*str); },
 		[](shared_ptr<Variable> const& var) { return var->run().to_number(); },
 		[](shared_ptr<Function> const& func) { return func->run().to_number(); },
 	}, data);
