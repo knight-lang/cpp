@@ -1,6 +1,7 @@
 #include "value.hpp"
 #include "variable.hpp"
 #include "function.hpp"
+#include <algorithm>
 
 using namespace kn;
 using std::make_shared;
