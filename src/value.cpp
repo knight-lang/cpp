@@ -12,7 +12,7 @@ Value::Value(bool boolean) noexcept : data(boolean) {}
 Value::Value(number num) noexcept : data(num) {}
 Value::Value(string str) noexcept : Value(make_shared<string>(str)) {}
 Value::Value(shared_ptr<string> str) noexcept : data(str) {}
-Value::Value(shared_ptr<Variable> var) noexcept : data(var) {}
+Value::Value(Variable* var) noexcept : data(var) {}
 Value::Value(shared_ptr<Function> func) noexcept : data(func) {}
 
 static void remove_keyword(std::string_view& view) {
@@ -102,7 +102,7 @@ bool Value::to_boolean() {
 		[](bool boolean) { return boolean; },
 		[](number num) { return num != 0; },
 		[](shared_ptr<string> const& str) { return str->length() != 0; },
-		[](shared_ptr<Variable> const& var) { return var->run().to_boolean(); },
+		[](Variable* var) { return var->run().to_boolean(); },
 		[](shared_ptr<Function> const& func) { return func->run().to_boolean(); }
 	}, data);
 }
@@ -133,7 +133,7 @@ number Value::to_number() {
 		[](bool boolean) { return (number) boolean; },
 		[](number num) { return num; },
 		[](shared_ptr<string> const& str) { return string_to_number(*str); },
-		[](shared_ptr<Variable> const& var) { return var->run().to_number(); },
+		[](Variable* var) { return var->run().to_number(); },
 		[](shared_ptr<Function> const& func) { return func->run().to_number(); },
 	}, data);
 }
@@ -152,13 +152,13 @@ shared_ptr<string> Value::to_string() {
 		},
 		[](number num) { return make_shared<string>(std::to_string(num)); },
 		[](shared_ptr<string> const& str) { return str; },
-		[](shared_ptr<Variable> const& var) { return var->run().to_string(); },
+		[](Variable* var) { return var->run().to_string(); },
 		[](shared_ptr<Function> const& func) { return func->run().to_string(); },
 	}, data);
 }
 
-shared_ptr<Variable> Value::as_variable() const {
-	if (auto var = std::get_if<shared_ptr<Variable>>(&data))
+Variable *Value::as_variable() const {
+	if (auto var = std::get_if<Variable*>(&data))
 		return *var;
 
 	throw Error("invalid kind for 'as_variable'");
@@ -170,7 +170,7 @@ std::ostream& Value::dump(std::ostream& out) const {
 		[&](bool boolean) { out << (boolean ? "Boolean(true)" : "Boolean(false)"); },
 		[&](number num) { out << "Number(" << num << ")"; },
 		[&](shared_ptr<string> const& str) { out << "String(" << *str << ")"; },
-		[&](shared_ptr<Variable> const& var) { out << var; },
+		[&](Variable* var) { out << var; },
 		[&](shared_ptr<Function> const& func) { out << func; },
 	}, data);
 
@@ -178,7 +178,7 @@ std::ostream& Value::dump(std::ostream& out) const {
 }
 
 Value Value::run() {
-	if (auto var = std::get_if<shared_ptr<Variable>>(&data))
+	if (auto var = std::get_if<Variable*>(&data))
 		return (*var)->run();
 
 	if (auto func = std::get_if<shared_ptr<Function>>(&data))
@@ -291,7 +291,7 @@ bool Value::operator==(Value&& rhs) {
 		[&](bool boolean) { return boolean == std::get<bool>(rhs.data); },
 		[&](number num) { return num == std::get<number>(rhs.data); },
 		[&](shared_ptr<string> const& str) { return *str == *std::get<shared_ptr<string>>(rhs.data); },
-		[&](shared_ptr<Variable> const& var) { return var == std::get<shared_ptr<Variable>>(rhs.data); },
+		[&](Variable* var) { return var == std::get<Variable*>(rhs.data); },
 		[&](shared_ptr<Function> const& var) { return var == std::get<shared_ptr<Function>>(rhs.data); }
 	}, data);
 }

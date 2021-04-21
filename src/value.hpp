@@ -23,7 +23,7 @@ class Value {
 		bool,
 		number,
 		std::shared_ptr<string>,
-		std::shared_ptr<Variable>,
+		Variable*,
 		std::shared_ptr<Function>
 	> data;
 
@@ -34,7 +34,7 @@ class Value {
 		explicit Value(number num) noexcept;
 		explicit Value(string str) noexcept;
 		explicit Value(std::shared_ptr<string> str) noexcept;
-		explicit Value(std::shared_ptr<Variable> var) noexcept;
+		explicit Value(Variable* var) noexcept;
 		explicit Value(std::shared_ptr<Function> func) noexcept;
 		static std::optional<Value> parse(std::string_view& view);
 
@@ -44,7 +44,7 @@ class Value {
 		bool to_boolean();
 		number to_number();
 		std::shared_ptr<string> to_string();
-		std::shared_ptr<Variable> as_variable() const;
+		Variable* as_variable() const;
 
 		Value operator+(Value&& rhs);
 		Value operator-(Value&& rhs);

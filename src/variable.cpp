@@ -8,7 +8,8 @@ using namespace kn;
 Variable::Variable(std::string name) noexcept : name(name) {}
 
 // The set of all known variables.
-static robin_hood::unordered_map<std::string_view, std::shared_ptr<Variable>> ENVIRONMENT;
+// note that variables last for the lifetime of the program, which is why we have pointers
+static robin_hood::unordered_map<std::string_view, Variable*> ENVIRONMENT;
 
 std::optional<Value> Variable::parse(std::string_view& view) {
 	char front = view.front();
@@ -28,10 +29,10 @@ std::optional<Value> Variable::parse(std::string_view& view) {
 	if (auto match = ENVIRONMENT.find(identifier); match != ENVIRONMENT.cend())
 		return std::make_optional<Value>(match->second);
 
-	auto variable = std::make_shared<Variable>(std::string(identifier));
-	auto result = ENVIRONMENT.emplace(std::string_view(variable->name), std::move(variable));
+	auto variable = new Variable(std::string(identifier));
+	ENVIRONMENT.emplace(std::string_view(variable->name), variable);
 
-	return std::make_optional<Value>(result.first->second);
+	return std::make_optional<Value>(variable);
 }
 
 std::ostream& Variable::dump(std::ostream& out) const noexcept {
