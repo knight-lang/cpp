@@ -70,7 +70,7 @@ static Value prompt(args_t& args) {
 	string line;
 	std::getline(std::cin, line);
 
-	return Value(line);
+	return Value(String(line));
 }
 
 // Gets a random number.
@@ -134,7 +134,7 @@ static Value system(args_t& args) {
 		throw Error("unable to close command stream.");
 	}
 
-	return Value(string(result));
+	return Value(String(std::string(result)));
 }
 
 // Stops the program with the given status code.
@@ -170,10 +170,10 @@ static Value output(args_t& args) {
 	if (!str->empty() && str->back() == '\\') {
 		str->pop_back(); // delete the trailing newline
 
-		std::cout << str;
+		std::cout << *str;
 		str->push_back('\\'); // add it back
 	} else {
-		std::cout << str << std::endl;
+		std::cout << *str << std::endl;
 	}
 
 	return Value();
@@ -283,10 +283,10 @@ static Value get(args_t& args) {
 		auto length = args[2].to_number();
 
 		if (start >= (number) str->length()) {
-			return Value(string());
+			return Value(String());
 		}
 
-		return Value(str->substr(start, length));
+		return Value(String(str->substr(start, length)));
 	}
 
 // Returns a new string with first string's range `[second, second+third)` replaced by the fourth value.
@@ -297,7 +297,7 @@ static Value substitute(args_t& args) {
 	auto repl = args[3].to_string();
 
 	// this could be made more efficient by preallocating memory
-	return Value(str->substr(0, start) + *repl + str->substr(start + length));
+	return Value(String(str->substr(0, start) + std::string(*repl) + str->substr(start + length)));
 }
 
 

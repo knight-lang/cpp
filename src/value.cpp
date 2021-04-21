@@ -4,16 +4,13 @@
 #include <algorithm>
 
 using namespace kn;
-using std::make_shared;
-using std::shared_ptr;
 
 Value::Value() noexcept : data(null {}) {}
 Value::Value(bool boolean) noexcept : data(boolean) {}
 Value::Value(number num) noexcept : data(num) {}
-Value::Value(string str) noexcept : Value(make_shared<string>(str)) {}
-Value::Value(shared_ptr<string> str) noexcept : data(str) {}
+Value::Value(String str) noexcept : data(str) {}
 Value::Value(Variable* var) noexcept : data(var) {}
-Value::Value(shared_ptr<Function> func) noexcept : data(func) {}
+Value::Value(std::shared_ptr<Function> func) noexcept : data(func) {}
 
 static void remove_keyword(std::string_view& view) {
 	do {
@@ -64,7 +61,7 @@ top:
 		string ret(begin, view.cbegin());
 		view.remove_prefix(1);
 
-		return std::make_optional<Value>(ret);
+		return std::make_optional<Value>(String(ret));
 	}
 
 	case '0': case '1': case '2': case '3': case '4':
@@ -101,14 +98,14 @@ bool Value::to_boolean() {
 		[](null) { return false; },
 		[](bool boolean) { return boolean; },
 		[](number num) { return num != 0; },
-		[](shared_ptr<string> const& str) { return str->length() != 0; },
+		[](String const& str) { return (str)->length() != 0; },
 		[](Variable* var) { return var->run().to_boolean(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_boolean(); }
+		[](std::shared_ptr<Function> const& func) { return func->run().to_boolean(); }
 	}, data);
 }
 
 
-static number string_to_number(string const& str) {
+static number string_to_number(std::string_view const& str) {
 	// a custom `stroll` that will will just stop at the first invalid character
 	number ret = 0;
 	auto begin = std::find_if_not(str.cbegin(), str.cend(), [](char c) { return std::isspace(c); });
@@ -132,32 +129,32 @@ number Value::to_number() {
 		[](null) { return (number) 0; },
 		[](bool boolean) { return (number) boolean; },
 		[](number num) { return num; },
-		[](shared_ptr<string> const& str) { return string_to_number(*str); },
+		[](String const& str) { return string_to_number(str); },
 		[](Variable* var) { return var->run().to_number(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_number(); },
+		[](std::shared_ptr<Function> const& func) { return func->run().to_number(); },
 	}, data);
 }
 
 
-shared_ptr<string> Value::to_string() {
+String Value::to_string() {
 	return std::visit(overload {
 		[](null) {
-			static shared_ptr<string> null_string = make_shared<string>("null");
+			static String null_string = String(std::string("null"));
 			return null_string;
 		},
 		[](bool boolean) {
-			static shared_ptr<string> true_string = make_shared<string>("true");
-			static shared_ptr<string> false_string = make_shared<string>("false");
+			static String true_string = String(std::string("true"));
+			static String false_string = String(std::string("false"));
 			return boolean ? true_string : false_string;
 		},
-		[](number num) { return make_shared<string>(std::to_string(num)); },
-		[](shared_ptr<string> const& str) { return str; },
+		[](number num) { return String(std::to_string(num)); },
+		[](String const& str) { return str; },
 		[](Variable* var) { return var->run().to_string(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_string(); },
+		[](std::shared_ptr<Function> const& func) { return func->run().to_string(); },
 	}, data);
 }
 
-Variable *Value::as_variable() const {
+Variable* Value::as_variable() const {
 	if (auto var = std::get_if<Variable*>(&data))
 		return *var;
 
@@ -169,9 +166,9 @@ std::ostream& Value::dump(std::ostream& out) const {
 		[&](null) { out << "Null()"; }, 
 		[&](bool boolean) { out << (boolean ? "Boolean(true)" : "Boolean(false)"); },
 		[&](number num) { out << "Number(" << num << ")"; },
-		[&](shared_ptr<string> const& str) { out << "String(" << *str << ")"; },
+		[&](String const& str) { out << "String(" << str.fetch() << ")"; },
 		[&](Variable* var) { out << var; },
-		[&](shared_ptr<Function> const& func) { out << func; },
+		[&](std::shared_ptr<Function> const& func) { out << func; },
 	}, data);
 
 	return out;
@@ -181,15 +178,15 @@ Value Value::run() {
 	if (auto var = std::get_if<Variable*>(&data))
 		return (*var)->run();
 
-	if (auto func = std::get_if<shared_ptr<Function>>(&data))
+	if (auto func = std::get_if<std::shared_ptr<Function>>(&data))
 		return (*func)->run();
 
 	return *this;
 }
 
 Value Value::operator+(Value&& rhs) {
-	if (auto str = std::get_if<shared_ptr<string>>(&data))
-		return Value(make_shared<string>(**str + *rhs.to_string()));
+	if (auto str = std::get_if<String>(&data))
+		return Value(String(**str + *rhs.to_string()));
 
 	if (auto num = std::get_if<number>(&data))
 		return Value(*num + rhs.to_number());
@@ -208,7 +205,7 @@ Value Value::operator*(Value&& rhs) {
 	if (auto num = std::get_if<number>(&data))
 		return Value(*num * rhs.to_number());
 
-	auto str = std::get_if<shared_ptr<string>>(&data);
+	auto str = std::get_if<String>(&data);
 
 	if (!str)
 		throw Error("invalid kind given to '*'");
@@ -223,7 +220,7 @@ Value Value::operator*(Value&& rhs) {
 	for (auto i = 0; i < rhs_num; ++i)
 		ret += **str;
 
-	return Value(ret);
+	return Value(String(ret));
 }
 
 Value Value::operator/(Value&& rhs) {
@@ -290,9 +287,9 @@ bool Value::operator==(Value&& rhs) {
 		[&](null) { return true; },
 		[&](bool boolean) { return boolean == std::get<bool>(rhs.data); },
 		[&](number num) { return num == std::get<number>(rhs.data); },
-		[&](shared_ptr<string> const& str) { return *str == *std::get<shared_ptr<string>>(rhs.data); },
+		[&](String const& str) { return str.fetch() == *std::get<String>(rhs.data); },
 		[&](Variable* var) { return var == std::get<Variable*>(rhs.data); },
-		[&](shared_ptr<Function> const& var) { return var == std::get<shared_ptr<Function>>(rhs.data); }
+		[&](std::shared_ptr<Function> const& var) { return var == std::get<std::shared_ptr<Function>>(rhs.data); }
 	}, data);
 }
 
@@ -301,7 +298,7 @@ bool Value::operator<(Value&& rhs) {
 		using T = std::decay_t<decltype(lhs)>;
 
 		if constexpr (std::is_same_v<T, number>) return lhs < rhs.to_number();
-		else if constexpr (std::is_same_v<T, shared_ptr<string>>) return *lhs < *rhs.to_string();
+		else if constexpr (std::is_same_v<T, String>) return *lhs < *rhs.to_string();
 		else if constexpr (std::is_same_v<T, bool>) return rhs.to_boolean() && !lhs;
 		else throw Error("invalid kind given to '<'");
 	}, data);
@@ -312,7 +309,7 @@ bool Value::operator>(Value&& rhs) {
 		using T = std::decay_t<decltype(lhs)>;
 
 		if constexpr (std::is_same_v<T, number>) return lhs > rhs.to_number();
-		else if constexpr (std::is_same_v<T, shared_ptr<string>>) return *lhs > *rhs.to_string();
+		else if constexpr (std::is_same_v<T, String>) return *lhs > *rhs.to_string();
 		else if constexpr (std::is_same_v<T, bool>) return !rhs.to_boolean() && lhs;
 		else throw Error("invalid kind given to '>'");
 	}, data);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "error.hpp"
+#include "string.hpp"
 #include <string>
 #include <string_view>
 #include <memory>
@@ -22,7 +23,7 @@ class Value {
 		null,
 		bool,
 		number,
-		std::shared_ptr<string>,
+		String,
 		Variable*,
 		std::shared_ptr<Function>
 	> data;
@@ -32,8 +33,7 @@ class Value {
 		explicit Value() noexcept;
 		explicit Value(bool boolean) noexcept;
 		explicit Value(number num) noexcept;
-		explicit Value(string str) noexcept;
-		explicit Value(std::shared_ptr<string> str) noexcept;
+		explicit Value(String str) noexcept;
 		explicit Value(Variable* var) noexcept;
 		explicit Value(std::shared_ptr<Function> func) noexcept;
 		static std::optional<Value> parse(std::string_view& view);
@@ -43,7 +43,7 @@ class Value {
 
 		bool to_boolean();
 		number to_number();
-		std::shared_ptr<string> to_string();
+		String to_string();
 		Variable* as_variable() const;
 
 		Value operator+(Value&& rhs);
