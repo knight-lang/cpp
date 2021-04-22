@@ -273,7 +273,9 @@ Value Value::pow(Value&& rhs) {
 	else if (base == -1) ret = exp & 1 ? -1 : 1;
 	else if (exp == 1) ret = base;
 	else if (exp == 0) ret = 1;
-	else if (exp < 0) ret = 0; // already handled the `base == -1` case
+	else if (exp < 0)
+		if (base == 0) throw Error("cannot exponentiate 0 to a negative power");
+		else ret = 0; // already handled the `base == -1` case
 	else {
 		ret = 1;
 
