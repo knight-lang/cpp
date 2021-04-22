@@ -184,9 +184,30 @@ Value Value::run() {
 	return *this;
 }
 
+std::optional<String> *cache_slot(unsigned long hash);
+extern unsigned long kn_hash_acc(std::string_view view, unsigned long hash);
+extern unsigned long kn_hash(std::string_view view);
+
 Value Value::operator+(Value&& rhs) {
-	if (auto str = std::get_if<String>(&data))
-		return Value(String(**str + *rhs.to_string()));
+	if (auto lstr = std::get_if<String>(&data)) {
+		auto rstr = rhs.to_string();
+#ifdef KN_CACHE_ADDITION
+		if (!lstr->length()) return Value(rstr);
+		if (!lstr->length()) return Value(lstr);
+
+		auto cache = cache_slot(kn_hash_acc(*rstr, kn_hash(**lstr)));
+
+		if (*cache
+			&& lstr->length() == rstr->length()
+			&& (**cache)->substr(0, lstr->length()) == std::string_view(*lstr)
+			&& (**cache)->substr(lstr->length(), rstr->length()) == std::string_view(*rstr)
+		)
+			return Value(**cache);
+		return Value(String(*(*cache = std::make_optional<String>(**lstr + *rstr))));
+#else
+		return Value(String(**lstr + *rstr));
+#endif
+	}
 
 	if (auto num = std::get_if<number>(&data))
 		return Value(*num + rhs.to_number());

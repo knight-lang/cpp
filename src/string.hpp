@@ -25,6 +25,8 @@ namespace kn {
 		std::string& fetch() { return *str; }
 		std::string const& fetch() const { return *str; }
 
+		size_t length() const { return str->length(); }
+
 		std::string& operator*() {
 			return *str;
 		}

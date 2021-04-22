@@ -316,6 +316,7 @@ static Value substitute(args_t& args) {
 			return Value(String::fetch(std::string_view(str->c_str() + length)));
 	}
 
+
 	// this could be made more efficient by preallocating memory
 	return Value(String(str->substr(0, start) + std::string(*repl) + str->substr(start + length)));
 }
