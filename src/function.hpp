@@ -1,7 +1,7 @@
 #pragma once
 
 #include "value.hpp"
-#include "small_vector.hpp"
+#include <small_vector.hpp>
 
 namespace kn {
 	// The argument type that functions must accept.

@@ -308,11 +308,12 @@ static Value substitute(args_t& args) {
 	auto length = args[2].to_number();
 	auto repl = args[3].to_string();
 
-	if (str->length() == 0 && start == 0)
-		return Value(repl);
+	if (start == 0) {
+		if (str->length() == 0)
+			return Value(repl);
 
-	if (repl->length() == 0 && start == 0) {
-		return Value(String::fetch(std::string_view(str->c_str() + length)));
+		if (repl->length() == 0)
+			return Value(String::fetch(std::string_view(str->c_str() + length)));
 	}
 
 	// this could be made more efficient by preallocating memory

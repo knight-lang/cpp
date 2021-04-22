@@ -4,7 +4,7 @@ EXE?=knight
 CXX=g++
 
 CXXFLAGS+=-Wall -Wextra -Wpedantic -std=c++17
-override CXXFLAGS+=-F$(SRCDIR)
+override CXXFLAGS+=-F$(SRCDIR) -Iinclude
 
 ifdef DEBUG
 override CXXFLAGS+=-g -fsanitize=address,undefined
