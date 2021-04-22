@@ -111,6 +111,7 @@ static Value system(args_t& args) {
 
 	char *result = (char *) malloc(cap);
 	if (result == NULL) {
+		fclose(stream);
 		throw Error("cant malloc");
 	}
 
@@ -118,19 +119,29 @@ static Value system(args_t& args) {
 		length += tmp;
 		if (length == cap) {
 			cap *= 2;
-			result = (char *) realloc(result, cap);
-			if (result == NULL) {
+
+			if (auto result2 = (char *) realloc(result, cap)) {
+				result = result2;
+			} else {
+				free(result);
+				fclose(stream);
 				throw Error("cannot realloc");
 			}
 		}
 	}
 
+	result[length] = '\0';
+
 	// ignore any errors with the es
 	if (ferror(stream)) {
+		free(result);
+		fclose(stream);
 		throw Error("unable to read command stream");
 	}
 
 	if (pclose(stream) == -1) {
+		free(result);
+		fclose(stream);
 		throw Error("unable to close command stream.");
 	}
 
@@ -262,9 +273,8 @@ static Value assign(args_t& args) {
 //
 // The last value the body returned will be returned. If the body never ran, null will be returned.
 static Value while_(args_t& args) {
-	while (args[0].to_boolean()) {
+	while (args[0].to_boolean())
 		args[1].run();
-	}
 
 	return Value();
 }
@@ -280,14 +290,16 @@ static Value if_(args_t& args) {
 static Value get(args_t& args) {
 	auto str = args[0].to_string();
 	auto start = args[1].to_number();
-		auto length = args[2].to_number();
+	auto length = args[2].to_number();
 
-		if (start >= (number) str->length()) {
-			return Value(String());
-		}
+	if (start >= (number) str->length())
+		return Value(String());
 
-		return Value(String(str->substr(start, length)));
-	}
+	if (start + length >= (number) str->length())
+		return Value(String::fetch(std::string_view(str->c_str() + start)));
+
+	return Value(String::fetch(std::string_view(str->c_str() + start, length)));
+}
 
 // Returns a new string with first string's range `[second, second+third)` replaced by the fourth value.
 static Value substitute(args_t& args) {
@@ -295,6 +307,13 @@ static Value substitute(args_t& args) {
 	auto start = args[1].to_number();
 	auto length = args[2].to_number();
 	auto repl = args[3].to_string();
+
+	if (str->length() == 0 && start == 0)
+		return Value(repl);
+
+	if (repl->length() == 0 && start == 0) {
+		return Value(String::fetch(std::string_view(str->c_str() + length)));
+	}
 
 	// this could be made more efficient by preallocating memory
 	return Value(String(str->substr(0, start) + std::string(*repl) + str->substr(start + length)));

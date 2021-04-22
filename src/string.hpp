@@ -9,14 +9,12 @@ namespace kn {
 		std::shared_ptr<std::string> str;
 
 	public:
-		String() : String(0) {}
-		String(size_t length) : String(std::string(length, '\0')) {}
+		String();
+		String(size_t length);
 		String(std::string string) : String(std::make_shared<std::string>(string)) {}
 		String(std::shared_ptr<std::string> string) : str(string) {}
-		static String fetch(std::string_view view) {
-			return String(std::make_shared<std::string>(std::string(view)));
-		}
 
+		static String fetch(std::string_view view);
 		void cache() const;
 
 		template<typename T>

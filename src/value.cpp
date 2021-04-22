@@ -167,8 +167,8 @@ std::ostream& Value::dump(std::ostream& out) const {
 		[&](bool boolean) { out << (boolean ? "Boolean(true)" : "Boolean(false)"); },
 		[&](number num) { out << "Number(" << num << ")"; },
 		[&](String const& str) { out << "String(" << str.fetch() << ")"; },
-		[&](Variable* var) { out << var; },
-		[&](std::shared_ptr<Function> const& func) { out << func; },
+		[&](Variable* var) { var->dump(out); },
+		[&](std::shared_ptr<Function> const& func) { func->dump(out); },
 	}, data);
 
 	return out;
