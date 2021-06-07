@@ -164,6 +164,20 @@ Variable *Value::as_variable() const {
 	throw Error("invalid kind for 'as_variable'");
 }
 
+Value Value::to_ascii() const {
+	if (auto chr = std::get_if<number>(&data)) {
+		if (*chr <= '\0' || '~' < *chr) throw Error("number is not valid ascii");
+		return Value(string(1, *chr));
+	}
+
+	if (auto str = std::get_if<shared_ptr<string>>(&data)) {
+		if (!(*str)->length()) throw Error("string is empty");
+		return Value((number) (**str)[0]);
+	}
+
+	throw Error("invalid kind for 'to_ascii'");
+}
+
 std::ostream& Value::dump(std::ostream& out) const {
 	std::visit(overload {
 		[&](null) { out << "Null()"; }, 

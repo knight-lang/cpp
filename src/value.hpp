@@ -45,6 +45,7 @@ class Value {
 		number to_number();
 		std::shared_ptr<string> to_string();
 		Variable* as_variable() const;
+		Value to_ascii() const;
 
 		Value operator+(Value&& rhs);
 		Value operator-(Value&& rhs);

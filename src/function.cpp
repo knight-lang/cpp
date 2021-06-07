@@ -168,15 +168,20 @@ static Value output(args_t& args) {
 	auto str = args[0].to_string();
 
 	if (!str->empty() && str->back() == '\\') {
-		str->pop_back(); // delete the trailing newline
+		str->pop_back(); // delete the trailing backslash
 
-		std::cout << str;
+		std::cout << *str;
 		str->push_back('\\'); // add it back
 	} else {
-		std::cout << str << std::endl;
+		std::cout << *str << std::endl;
 	}
 
 	return Value();
+}
+
+// Gets the ascii value if the first argument.
+static Value ascii(args_t& args) {
+	return args[0].run().to_ascii();
 }
 
 // Adds two values together.
@@ -317,6 +322,8 @@ void Function::initialize(void) {
 	Function::register_function('L', 1, &::length);
 	Function::register_function('D', 1, &::dump);
 	Function::register_function('O', 1, &::output);
+	Function::register_function('A', 1, &::ascii);
+
 	Function::register_function('+', 2, &::add);
 	Function::register_function('-', 2, &::sub);
 	Function::register_function('*', 2, &::mul);
