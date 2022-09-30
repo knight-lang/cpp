@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <random>
 
 namespace kn {
 
@@ -74,7 +75,11 @@ static Value prompt(args_t&) {
 
 // Gets a random number.
 static Value random(args_t&) {
-	return Value((number) rand());
+	static thread_local std::random_device rd;
+	static thread_local std::mt19937 gen(rd());
+	static thread_local std::uniform_int_distribution<number> dist;
+
+	return Value((number) dist(gen));
 }
 
 // Creates a block of code.
@@ -312,8 +317,6 @@ static Value substitute(args_t& args) {
 }
 
 void Function::initialize(void) {
-	srand(time(NULL)); // seed `R`'s random number.
-
 	Function::register_function('P', 0, &prompt);
 	Function::register_function('R', 0, &random);
 
