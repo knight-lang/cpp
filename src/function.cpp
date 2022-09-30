@@ -33,10 +33,12 @@ std::optional<Value> Function::parse(std::string_view& view) {
 	// parse the arguments out.
 	args_t args;
 	for(size_t i = 0; i < func_pair.second; ++i) {
-		if (auto value = Value::parse(view))
-			args.push_back(*value);
-		else
+		auto value = Value::parse(view);
+
+		if (!value)
 			throw Error("Cannot parse function.");
+
+		args.push_back(*value);
 	}
 
 	return std::make_optional<Value>(make_shared<Function>(Function(func_pair.first, front, args)));
@@ -46,10 +48,18 @@ void Function::register_function(char name, size_t arity, funcptr_t func) {
 	FUNCTIONS.insert({ name, std::make_pair(func, arity) });
 }
 
-// Prompts for a single line from stdin.
-static Value prompt(args_t& args) {
-	(void) args;
+std::ostream& operator<<(std::ostream& out, Function const& func) {
+	out << "Function(" << func.name;
 
+	for (auto arg : func.args)
+		out << ", " << arg;
+
+	return out << ")";
+}
+
+
+// Prompts for a single line from stdin.
+static Value prompt(args_t&) {
 	string line;
 	std::getline(std::cin, line);
 
@@ -63,9 +73,7 @@ static Value prompt(args_t& args) {
 }
 
 // Gets a random number.
-static Value random(args_t& args) {
-	(void) args;
-
+static Value random(args_t&) {
 	return Value((number) rand());
 }
 
@@ -80,6 +88,7 @@ static Value call(args_t& args) {
 }
 
 // Evaluates the argument as Knight source code.
+#ifndef KN_NEXTENSIONS
 static Value eval(args_t& args) {
 	auto code = args[0].run().to_string();
 	return kn::play(std::string_view(*code));
@@ -126,6 +135,7 @@ static Value system(args_t& args) {
 
 	return Value(string(result));
 }
+#endif /* !KN_NEXTENSIONS */
 
 // Stops the program with the given status code.
 static Value quit(args_t& args) {
@@ -145,9 +155,7 @@ static Value length(args_t& args) {
 // Returns the length of the argument, when converted to a string.
 static Value dump(args_t& args) {
 	auto arg = args[0].run();
-
 	std::cout << arg;
-
 	return arg;
 }
 
@@ -159,7 +167,6 @@ static Value output(args_t& args) {
 
 	if (!str->empty() && str->back() == '\\') {
 		str->pop_back(); // delete the trailing backslash
-
 		std::cout << *str;
 		str->push_back('\\'); // add it back
 	} else {
@@ -180,10 +187,7 @@ static Value negate(args_t& args) {
 }
 
 static Value box(args_t& args) {
-	list lst;
-	lst.reserve(1);
-	lst.push_back(args[0].run());
-	return Value(lst);
+	return Value(list{args[0].run()});
 }
 
 static Value head(args_t& args) {
@@ -267,9 +271,7 @@ static Value assign(args_t& args) {
 		throw Error("cannot assign to non-variables");
 
 	auto value = args[1].run();
-
 	variable->assign(value);
-
 	return value;
 }
 
@@ -277,16 +279,15 @@ static Value assign(args_t& args) {
 //
 // The last value the body returned will be returned. If the body never ran, null will be returned.
 static Value while_(args_t& args) {
-	while (args[0].run().to_boolean()) {
+	while (args[0].run().to_boolean())
 		args[1].run();
-	}
 
 	return Value();
 }
 
 // Runs the second value if the first is truthy. Otherwise, runs the third value.
 static Value if_(args_t& args) {
-	return args[0].run().to_boolean() ? args[1].run() : args[2].run();
+	return args[1 + !args[0].run().to_boolean()].run();
 }
 
 // Returns a substring of the first value, with the second value as the start index and the third as the length.
@@ -309,7 +310,6 @@ static Value substitute(args_t& args) {
 
 	return container.set(start, length, replacement);
 }
-
 
 void Function::initialize(void) {
 	srand(time(NULL)); // seed `R`'s random number.

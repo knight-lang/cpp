@@ -171,17 +171,10 @@ shared<string> Value::to_string() const {
 	}, data);
 }
 
-static shared<list> make_single_list(Value v) {
-	list lst;
-	lst.reserve(1);
-	lst.push_back(v);
-	return kn::make_shared<list>(lst);
-}
-
 shared<list> Value::to_list() const {
 	static auto empty_list = kn::make_shared<list>();
-	static auto true_list = make_single_list(Value(true));
-	static auto zero_list = make_single_list(Value((number) 0));
+	static auto true_list = kn::make_shared<list>(list{Value(true)});
+	static auto zero_list = kn::make_shared<list>(list{Value((number) 0)});
 
 	return std::visit(overload {
 		[](null) { return empty_list; },
@@ -268,7 +261,8 @@ Variable *Value::as_variable() const {
 Value Value::to_ascii() const {
 	if (auto chr = std::get_if<number>(&data)) {
 		if (*chr <= '\0' || '~' < *chr) throw Error("number is not valid ascii");
-		return Value(*chr);
+		char c = (char) *chr; // cause of coercion nonsense
+		return Value(c);
 	}
 
 	if (auto str = std::get_if<shared<string>>(&data)) {

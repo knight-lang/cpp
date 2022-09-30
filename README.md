@@ -3,3 +3,6 @@ This is a [Knight 2.0.1](https://github.com/knight-lang/knight-lang) implementat
 
 # Compiling
 Simply run `make` to build it. You can then execute it via `./knight (-e 'expr' | -f filename)`. To enable debug mode, use `DEBUG=1 make`
+
+## Flags
+If you enable `KN_NEXTENSIONS`, the `EVAL` and `$` extensions will be disabled.
