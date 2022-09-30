@@ -2,22 +2,24 @@
 #include "variable.hpp"
 #include "function.hpp"
 #include <algorithm>
+#include <cmath>
 
 using namespace kn;
-using std::make_shared;
-using std::shared_ptr;
 
 Value::Value() noexcept : data(null {}) {}
 Value::Value(bool boolean) noexcept : data(boolean) {}
 Value::Value(number num) noexcept : data(num) {}
-Value::Value(string str) noexcept : Value(make_shared<string>(str)) {}
-Value::Value(shared_ptr<string> str) noexcept : data(str) {}
+Value::Value(char chr) noexcept : Value(kn::make_shared<string>(1, chr)) {}
+Value::Value(string str) noexcept : Value(kn::make_shared<string>(str)) {}
+Value::Value(shared<string> str) noexcept : data(str) {}
+Value::Value(list lst) noexcept : Value(kn::make_shared<list>(lst)) {}
+Value::Value(shared<list> lst) noexcept : data(lst) {}
 Value::Value(Variable* var) noexcept : data(var) {}
-Value::Value(shared_ptr<Function> func) noexcept : data(func) {}
+Value::Value(shared<Function> func) noexcept : data(func) {}
 
 static void remove_keyword(std::string_view& view) {
 	do {
-			view.remove_prefix(1);
+		view.remove_prefix(1);
 	} while (std::isupper(view.front()) || view.front() == '_');
 }
 
@@ -37,7 +39,7 @@ top:
 		// fallthrough, as we know the first character is `\n`.
 
 	case ' ': case '\t': case '\n': case '\r': case '\v': case '\f':
-	case '(': case  ')': case  '[': case  ']': case  '{': case  '}': case ':': 
+	case '(': case  ')': case ':': 
 		do {
 			view.remove_prefix(1);
 		} while (std::isspace(view.front()));
@@ -51,6 +53,10 @@ top:
 	case 'F':
 		remove_keyword(view);
 		return std::make_optional<Value>(front == 'T');
+
+	case '@':
+		view.remove_prefix(1);
+		return std::make_optional<Value>(std::vector<Value>());
 
 	case '\'':
 	case '\"': {
@@ -96,17 +102,16 @@ struct overload : Fns... { using Fns::operator()...; };
 template <typename... Fns>
 overload(Fns...) -> overload<Fns...>;
 
-bool Value::to_boolean() {
+bool Value::to_boolean() const {
 	return std::visit(overload {
 		[](null) { return false; },
 		[](bool boolean) { return boolean; },
 		[](number num) { return num != 0; },
-		[](shared_ptr<string> const& str) { return str->length() != 0; },
-		[](Variable* var) { return var->run().to_boolean(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_boolean(); }
+		[](shared<string> const& str) { return str->length() != 0; },
+		[](shared<list> const& lst) { return lst->size() != 0; },
+		[](auto) -> bool { throw Error("bad type for boolean conversion"); }
 	}, data);
 }
-
 
 static number string_to_number(string const& str) {
 	// a custom `stroll` that will will just stop at the first invalid character
@@ -127,34 +132,132 @@ static number string_to_number(string const& str) {
 	return ret * sign;
 }
 
-number Value::to_number() {
+number Value::to_number() const {
 	return std::visit(overload {
 		[](null) { return (number) 0; },
 		[](bool boolean) { return (number) boolean; },
 		[](number num) { return num; },
-		[](shared_ptr<string> const& str) { return string_to_number(*str); },
-		[](Variable* var) { return var->run().to_number(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_number(); },
+		[](shared<string> const& str) { return string_to_number(*str); },
+		[](shared<list> const& lst) { return (number) lst->size(); },
+		[](auto) -> number { throw Error("bad type for number conversion"); }
 	}, data);
 }
 
 
-shared_ptr<string> Value::to_string() {
+static string join_list(list const& lst, std::string_view sep) {
+	string s;
+	bool start = true;
+
+	for (auto ele : lst) {
+		if (!start)
+			s.append(sep);
+		start = false;
+		s.append(*ele.to_string());
+	}
+
+	return s;
+}
+
+shared<string> Value::to_string() const {
 	return std::visit(overload {
 		[](null) {
-			static shared_ptr<string> null_string = make_shared<string>("null");
+			static shared<string> null_string = kn::make_shared<string>("");
 			return null_string;
 		},
 		[](bool boolean) {
-			static shared_ptr<string> true_string = make_shared<string>("true");
-			static shared_ptr<string> false_string = make_shared<string>("false");
+			static shared<string> true_string = kn::make_shared<string>("true");
+			static shared<string> false_string = kn::make_shared<string>("false");
 			return boolean ? true_string : false_string;
 		},
-		[](number num) { return make_shared<string>(std::to_string(num)); },
-		[](shared_ptr<string> const& str) { return str; },
-		[](Variable* var) { return var->run().to_string(); },
-		[](shared_ptr<Function> const& func) { return func->run().to_string(); },
+		[](number num) { return kn::make_shared<string>(std::to_string(num)); },
+		[](shared<string> const& str) { return str; },
+		[](shared<list> const& lst) { return kn::make_shared<string>(join_list(*lst, std::string_view("\n"))); },
+		[](auto) -> shared<string> { throw Error("bad type for string conversion"); }
 	}, data);
+}
+
+static shared<list> make_single_list(Value v) {
+	list lst;
+	lst.reserve(1);
+	lst.push_back(v);
+	return kn::make_shared<list>(lst);
+}
+
+shared<list> Value::to_list() const {
+	static auto empty_list = kn::make_shared<list>();
+	static auto true_list = make_single_list(Value(true));
+	static auto zero_list = make_single_list(Value((number) 0));
+
+	return std::visit(overload {
+		[](null) { return empty_list; },
+		[](bool boolean) { return boolean ? true_list : empty_list; },
+		[](number num) {
+			if (num == 0) return zero_list;
+
+			list lst;
+			for (; num != 0; num /= 10)
+				lst.push_back(Value(num % 10));
+
+			std::reverse(lst.begin(), lst.end());
+			lst.shrink_to_fit();
+			return kn::make_shared<list>(lst);
+		},
+		[](shared<string> const& str) {
+			if (str->length() == 0)
+				return empty_list;
+
+			list lst;
+			lst.reserve(str->length());
+			for (auto chr : *str)
+				lst.push_back(Value(chr));
+			return kn::make_shared<list>(lst);
+		},
+		[](shared<list> const& lst) { return lst; },
+		[](auto) -> shared<list> { throw Error("bad type for list conversion"); }
+	}, data);
+}
+
+std::ostream& Value::dump(std::ostream& out) const {
+	std::visit(overload {
+		[&](null) { out << "null"; }, 
+		[&](bool boolean) { out << (boolean ? "true" : "false"); },
+		[&](number num) { out << num; },
+		[&](shared<string> const& str) {
+			out << "\"";
+
+			for (auto chr : *str) {
+				switch (chr) {
+				case '\r': out << "\\r"; break;
+				case '\n': out << "\\n"; break;
+				case '\t': out << "\\t"; break;
+
+				case '\\':
+				case '\"':
+					out << "\\";
+					[[fallthrough]];
+				default:
+					out << chr;
+				}
+			}
+
+			out << "\"";
+		},
+		[&](shared<list> const& lst) {
+			out << "[";
+			bool first = true;
+			for (auto ele : *lst) {
+				if (!first)
+					out << ", ";
+				first = false;
+				out << ele;
+			}
+			out << "]";
+		},
+		[&](Variable* var) { out << *var; },
+		[&](shared<Function> const& func) { out << *func; },
+	}, data);
+
+	return out;
 }
 
 Variable *Value::as_variable() const {
@@ -170,7 +273,7 @@ Value Value::to_ascii() const {
 		return Value(string(1, *chr));
 	}
 
-	if (auto str = std::get_if<shared_ptr<string>>(&data)) {
+	if (auto str = std::get_if<shared<string>>(&data)) {
 		if (!(*str)->length()) throw Error("string is empty");
 		return Value((number) (**str)[0]);
 	}
@@ -178,69 +281,148 @@ Value Value::to_ascii() const {
 	throw Error("invalid kind for 'to_ascii'");
 }
 
-std::ostream& Value::dump(std::ostream& out) const {
-	std::visit(overload {
-		[&](null) { out << "Null()"; }, 
-		[&](bool boolean) { out << (boolean ? "Boolean(true)" : "Boolean(false)"); },
-		[&](number num) { out << "Number(" << num << ")"; },
-		[&](shared_ptr<string> const& str) { out << "String(" << *str << ")"; },
-		[&](Variable* var) { out << var; },
-		[&](shared_ptr<Function> const& func) { out << func; },
-	}, data);
+Value Value::get(size_t start, size_t length) const {
+	if (auto lst = std::get_if<shared<list>>(&data))
+		return Value(list((*lst)->cbegin() + start, (*lst)->cbegin() + start + length));
 
-	return out;
+	if (auto str = std::get_if<shared<string>>(&data))
+		return Value((*str)->substr(start, length));
+
+	throw Error("invalid kind for get");
+}
+
+Value Value::set(size_t start, size_t length, Value replacement) const {
+	if (auto lst = std::get_if<shared<list>>(&data)) {
+		auto repl = replacement.to_list();
+		list res((*lst)->size() + repl->size() - length);
+		std::copy((*lst)->cbegin(), (*lst)->cbegin() + start, res.begin());
+		std::copy(repl->cbegin(), repl->cend(), res.begin() + start);
+		std::copy((*lst)->cbegin() + start + length, (*lst)->cend(), res.begin() + start + repl->size());
+		return Value(res);
+	}
+
+	if (auto str = std::get_if<shared<string>>(&data)) {
+		auto repl = replacement.to_string();
+		string res;
+		res.reserve((*str)->length() + repl->length() - length);
+		res.append(**str, 0, start);
+		res.append(*repl);
+		res.append(**str, start + length, std::string::npos);
+		return Value(res);
+	}
+
+	throw Error("invalid kind for set");
+}
+
+
+Value Value::head() const {
+	if (auto lst = std::get_if<shared<list>>(&data)) {
+		if ((*lst)->size() == 0)
+			throw Error("head on empty list");
+		return (**lst)[0];
+	}
+
+	if (auto str = std::get_if<shared<string>>(&data)) {
+		if ((*str)->length() == 0)
+			throw Error("head on empty string");
+		return Value((**str)[0]);
+	}
+
+	throw Error("head on non-list non-string");
+}
+
+Value Value::tail() const {
+	if (auto lst = std::get_if<shared<list>>(&data)) {
+		auto iter = (*lst)->cbegin();
+		if (iter++ == (*lst)->cend())
+			throw Error("tail on empty list");
+		return Value(list(iter, (*lst)->cend()));
+	}
+
+	if (auto str = std::get_if<shared<string>>(&data)) {
+		auto iter = (*str)->cbegin();
+		if (iter++ == (*str)->cend())
+			throw Error("tail on empty string");
+		return Value(string(iter, (*str)->cend()));
+	}
+
+	throw Error("tail on non-list non-string");
 }
 
 Value Value::run() {
 	if (auto var = std::get_if<Variable*>(&data))
 		return (*var)->run();
 
-	if (auto func = std::get_if<shared_ptr<Function>>(&data))
+	if (auto func = std::get_if<shared<Function>>(&data))
 		return (*func)->run();
 
 	return *this;
 }
 
-Value Value::operator+(Value&& rhs) {
-	if (auto str = std::get_if<shared_ptr<string>>(&data))
-		return Value(make_shared<string>(**str + *rhs.to_string()));
+
+Value Value::operator-() const {
+	return Value(-to_number());
+}
+
+Value Value::operator+(Value const& rhs) const {
+	if (auto str = std::get_if<shared<string>>(&data))
+		return Value(kn::make_shared<string>(**str + *rhs.to_string()));
 
 	if (auto num = std::get_if<number>(&data))
 		return Value(*num + rhs.to_number());
 
+	if (auto lst = std::get_if<shared<list>>(&data)) {
+		auto rlist = rhs.to_list();
+		list cat;
+		cat.reserve((*lst)->size() + rlist->size());
+		cat.insert(cat.end(), (*lst)->begin(), (*lst)->end());
+		cat.insert(cat.end(), rlist->begin(), rlist->end());
+		return Value(kn::make_shared<list>(cat));
+	}
+
 	throw Error("invalid kind given to '+'");
 }
 
-Value Value::operator-(Value&& rhs) {
+Value Value::operator-(Value const& rhs) const {
 	if (auto num = std::get_if<number>(&data))
 		return Value(*num - rhs.to_number());
 
 	throw Error("invalid kind given to '-'");
 }
 
-Value Value::operator*(Value&& rhs) {
+Value Value::operator*(Value const& rhs) const {
+	number amount = rhs.to_number();
+
 	if (auto num = std::get_if<number>(&data))
-		return Value(*num * rhs.to_number());
+		return Value(*num * amount);
 
-	auto str = std::get_if<shared_ptr<string>>(&data);
+	if (amount < 0)
+		throw Error("cannot replicate by a negative number");
 
-	if (!str)
-		throw Error("invalid kind given to '*'");
+	if (auto lst = std::get_if<shared<list>>(&data)) {
+		list ret((*lst)->size() * amount);
+		auto iter = ret.begin();
 
-	number rhs_num = rhs.to_number();
+		for (auto i = 0; i < amount; ++i)
+			iter = std::copy((*lst)->cbegin(), (*lst)->cend(), iter);
 
-	if (rhs_num < 0)
-		throw Error("cannot duplicate by a negative number");
+		return Value(ret);
+	}
 
-	string ret;
+	if (auto str = std::get_if<shared<string>>(&data)) {
+		string ret;
+		ret.reserve((*str)->length() * amount);
 
-	for (auto i = 0; i < rhs_num; ++i)
-		ret += **str;
+		for (auto i = 0; i < amount; ++i)
+			ret.append(**str);
 
-	return Value(ret);
+		return Value(ret);
+	}
+
+	throw Error("invalid kind given to '*'");
 }
 
-Value Value::operator/(Value&& rhs) {
+Value Value::operator/(Value const& rhs) const {
 	number num;
 
 	if (auto pnum = std::get_if<number>(&data))
@@ -256,7 +438,7 @@ Value Value::operator/(Value&& rhs) {
 	return Value(num / rnum);
 }
 
-Value Value::operator%(Value&& rhs) {
+Value Value::operator%(Value const& rhs) const {
 	number num;
 
 	if (auto pnum = std::get_if<number>(&data))
@@ -265,71 +447,46 @@ Value Value::operator%(Value&& rhs) {
 		throw Error("invalid kind given to '%'");
 
 	auto rnum = rhs.to_number();
-
 	if (!rnum)
 		throw new Error("Cannot modulo by zero");
 
 	return Value(num % rnum);
 }
 
-Value Value::pow(Value&& rhs) {
-	number base;
+Value Value::pow(Value const& rhs) const {
+	if (auto base = std::get_if<number>(&data))
+		return Value((number) std::pow(*base, rhs.to_number()));
 
-	if (auto pbase = std::get_if<number>(&data))
-		base = *pbase;
-	else
-		throw Error("invalid kind given to '%'");
+	if (auto lst = std::get_if<shared<list>>(&data))
+		return Value(join_list(**lst, std::string_view(rhs.to_string()->data())));
 
-	number exp = rhs.to_number();
-	number ret;
-
-	if (base == 1) ret = 1;
-	else if (base == -1) ret = exp & 1 ? -1 : 1;
-	else if (exp == 1) ret = base;
-	else if (exp == 0) ret = 1;
-	else if (exp < 0)
-		if (base == 0) throw Error("cannot exponentiate 0 to a negative power");
-		else ret = 0; // already handled the `base == -1` case
-	else {
-		ret = 1;
-
-		for (; exp > 0; --exp) ret *= base;
-	}
-	return Value(ret);
+	throw Error("invalid kind given to '^'");
 }
 
-bool Value::operator==(Value&& rhs) {
-	if (data.index() != rhs.data.index())
-		return false;
-
-	return std::visit(overload {
-		[&](null) { return true; },
-		[&](bool boolean) { return boolean == std::get<bool>(rhs.data); },
-		[&](number num) { return num == std::get<number>(rhs.data); },
-		[&](shared_ptr<string> const& str) { return *str == *std::get<shared_ptr<string>>(rhs.data); },
-		[&](Variable* var) { return var == std::get<Variable*>(rhs.data); },
-		[&](shared_ptr<Function> const& var) { return var == std::get<shared_ptr<Function>>(rhs.data); }
-	}, data);
+bool Value::operator==(Value const& rhs) const {
+	return data == rhs.data;
 }
 
-bool Value::operator<(Value&& rhs) {
+bool Value::operator<(Value const& rhs) const {
 	return std::visit([&](auto&& lhs) -> bool {
 		using T = std::decay_t<decltype(lhs)>;
 
 		if constexpr (std::is_same_v<T, number>) return lhs < rhs.to_number();
-		else if constexpr (std::is_same_v<T, shared_ptr<string>>) return *lhs < *rhs.to_string();
-		else if constexpr (std::is_same_v<T, bool>) return rhs.to_boolean() && !lhs;
+		else if constexpr (std::is_same_v<T, shared<string>>) return *lhs < *rhs.to_string();
+		else if constexpr (std::is_same_v<T, shared<list>>) return *lhs < *rhs.to_list();
+		else if constexpr (std::is_same_v<T, bool>) return !lhs && rhs.to_boolean();
 		else throw Error("invalid kind given to '<'");
 	}, data);
 }
 
-bool Value::operator>(Value&& rhs) {
+bool Value::operator>(Value const& rhs) const {
 	return std::visit([&](auto&& lhs) -> bool {
 		using T = std::decay_t<decltype(lhs)>;
 
 		if constexpr (std::is_same_v<T, number>) return lhs > rhs.to_number();
-		else if constexpr (std::is_same_v<T, shared_ptr<string>>) return *lhs > *rhs.to_string();
-		else if constexpr (std::is_same_v<T, bool>) return !rhs.to_boolean() && lhs;
+		else if constexpr (std::is_same_v<T, shared<string>>) return *lhs > *rhs.to_string();
+		else if constexpr (std::is_same_v<T, shared<list>>) return *lhs > *rhs.to_list();
+		else if constexpr (std::is_same_v<T, bool>) return lhs && !rhs.to_boolean();
 		else throw Error("invalid kind given to '>'");
 	}, data);
 }

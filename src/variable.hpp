@@ -31,7 +31,9 @@ namespace kn {
 		Value run();
 
 		// Provides debugging output of this type.
-		std::ostream& dump(std::ostream& out) const noexcept;
+		friend inline std::ostream& operator<<(std::ostream& out, Variable const& variable) {
+			return out << "Variable(" << variable.name << ")";
+		}
 
 		// Assigns a value to this variable, discarding its previous value.
 		void assign(Value newvalue) noexcept;

@@ -35,7 +35,15 @@ namespace kn {
 		Value run();
 
 		// Returns debugging information about this type.
-		std::ostream& dump(std::ostream& out) const;
+    	friend std::ostream& operator<<(std::ostream& out, Function const& func) {
+			out << "Function(" << func.name;
+
+			for (auto arg : func.args)
+				out << ", " << arg;
+
+			return out << ")";
+		}
+
 
 		// Attempts to parse a `Function` instance from the `string_view`.
 		//
@@ -49,5 +57,9 @@ namespace kn {
 
 		// Registers all builtin functions.
 		static void initialize();
+
+		bool operator==(const Function& rhs) const {
+			return this == (Function*) &rhs;
+		}
 	};
 }

@@ -7,24 +7,28 @@
 #include <variant>
 #include <ostream>
 #include <optional>
+#include <vector>
+#include "shared.hpp"
 
 namespace kn {
-	using number = long long;
-	using string = std::string;
-	struct null {};
-
-
+	class Value;
 	class Variable;
 	class Function;
+
+	using number = long long;
+	using string = std::string;
+	using list = std::vector<Value>;
+	using null = std::monostate;
 
 class Value {
 	std::variant<
 		null,
 		bool,
 		number,
-		std::shared_ptr<string>,
+		shared<string>,
+		shared<list>,
 		Variable*,
-		std::shared_ptr<Function>
+		shared<Function>
 	> data;
 
 	public:
@@ -32,30 +36,45 @@ class Value {
 		explicit Value() noexcept;
 		explicit Value(bool boolean) noexcept;
 		explicit Value(number num) noexcept;
+		explicit Value(char chr) noexcept;
 		explicit Value(string str) noexcept;
-		explicit Value(std::shared_ptr<string> str) noexcept;
+		explicit Value(shared<string> str) noexcept;
+		explicit Value(list lst) noexcept;
+		explicit Value(shared<list> lst) noexcept;
 		explicit Value(Variable* var) noexcept;
-		explicit Value(std::shared_ptr<Function> func) noexcept;
+		explicit Value(shared<Function> func) noexcept;
+
 		static std::optional<Value> parse(std::string_view& view);
 
 		Value run();
 		std::ostream& dump(std::ostream& out) const;
+		friend inline std::ostream& operator<<(std::ostream& out, Value const& value) {
+			return value.dump(out);
+		}
 
-		bool to_boolean();
-		number to_number();
-		std::shared_ptr<string> to_string();
+		bool to_boolean() const;
+		number to_number() const;
+		shared<string> to_string() const;
+		shared<list> to_list() const;
+
 		Variable* as_variable() const;
+
 		Value to_ascii() const;
+		Value get(size_t start, size_t length) const;
+		Value set(size_t start, size_t length, Value replacement) const;
+		Value head() const;
+		Value tail() const;
 
-		Value operator+(Value&& rhs);
-		Value operator-(Value&& rhs);
-		Value operator*(Value&& rhs);
-		Value operator/(Value&& rhs);
-		Value operator%(Value&& rhs);
-		Value pow(Value&& rhs);
+		Value operator-() const;
+		Value operator+(Value const& rhs) const;
+		Value operator-(Value const& rhs) const;
+		Value operator*(Value const& rhs) const;
+		Value operator/(Value const& rhs) const;
+		Value operator%(Value const& rhs) const;
+		Value pow(Value const& rhs) const;
 
-		bool operator==(Value&& rhs);
-		bool operator<(Value&& rhs);
-		bool operator>(Value&& rhs);
+		bool operator==(Value const& rhs) const;
+		bool operator<(Value const& rhs) const;
+		bool operator>(Value const& rhs) const;
 	};
 }

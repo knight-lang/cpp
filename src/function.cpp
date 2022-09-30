@@ -1,6 +1,7 @@
 #include "function.hpp"
 #include "value.hpp"
 #include "variable.hpp"
+#include "shared.hpp"
 #include "knight.hpp"
 #include "robin_hood_map.hpp"
 
@@ -44,19 +45,7 @@ std::optional<Value> Function::parse(std::string_view& view) {
 			throw Error("Cannot parse function.");
 	}
 
-	return std::make_optional<Value>(std::make_shared<Function>(Function(func_pair.first, front, args)));
-}
-
-
-std::ostream& Function::dump(std::ostream& out) const {
-	out << "Function(" << name;
-
-	for (auto arg : args) {
-		out << ", ";
-		arg.dump(out);
-	}
-
-	return out << ")";
+	return std::make_optional<Value>(make_shared<Function>(Function(func_pair.first, front, args)));
 }
 
 void Function::register_function(char name, size_t arity, funcptr_t func) {
@@ -69,6 +58,12 @@ static Value prompt(args_t& args) {
 
 	string line;
 	std::getline(std::cin, line);
+
+	if (std::cin.eof() && line.length() == 0)
+		return Value();
+
+	while (line.length() != 0 && line.back() == '\r')
+		line.pop_back();
 
 	return Value(line);
 }
@@ -92,13 +87,13 @@ static Value call(args_t& args) {
 
 // Evaluates the argument as Knight source code.
 static Value eval(args_t& args) {
-	return kn::run(*args[0].to_string());
+	return kn::run(*args[0].run().to_string());
 }
 
 // Runs a shell command, returns the stdout of the command.
 // effectively copied my C impl...
 static Value system(args_t& args) {
-	auto cmd = args[0].to_string();
+	auto cmd = args[0].run().to_string();
 	FILE *stream = popen(cmd->c_str(), "r");
 
 	if (stream == NULL) {
@@ -139,24 +134,24 @@ static Value system(args_t& args) {
 
 // Stops the program with the given status code.
 static Value quit(args_t& args) {
-	exit(args[0].to_number());
+	exit(args[0].run().to_number());
 }
 
 // Logical negation of its argument.
 static Value not_(args_t& args) {
-	return Value((bool) !args[0].to_boolean());
+	return Value((bool) !args[0].run().to_boolean());
 }
 
 // Returns the length of the argument, when converted to a string.
 static Value length(args_t& args) {
-	return Value((number) args[0].to_string()->length());
+	return Value((number) args[0].run().to_list()->size());
 }
 
 // Returns the length of the argument, when converted to a string.
 static Value dump(args_t& args) {
 	auto arg = args[0].run();
 
-	arg.dump(std::cout) << std::endl;
+	std::cout << arg;
 
 	return arg;
 }
@@ -165,7 +160,7 @@ static Value dump(args_t& args) {
 //
 // If the string ends with a backslash, its removed before printing. Otherwise, a newline is added.
 static Value output(args_t& args) {
-	auto str = args[0].to_string();
+	auto str = args[0].run().to_string();
 
 	if (!str->empty() && str->back() == '\\') {
 		str->pop_back(); // delete the trailing backslash
@@ -182,6 +177,26 @@ static Value output(args_t& args) {
 // Gets the ascii value if the first argument.
 static Value ascii(args_t& args) {
 	return args[0].run().to_ascii();
+}
+
+// Negates the first argument.
+static Value negate(args_t& args) {
+	return -args[0].run();
+}
+
+static Value box(args_t& args) {
+	list lst;
+	lst.reserve(1);
+	lst.push_back(args[0].run());
+	return Value(lst);
+}
+
+static Value head(args_t& args) {
+	return args[0].run().head();
+}
+
+static Value tail(args_t& args) {
+	return args[0].run().tail();
 }
 
 // Adds two values together.
@@ -267,7 +282,7 @@ static Value assign(args_t& args) {
 //
 // The last value the body returned will be returned. If the body never ran, null will be returned.
 static Value while_(args_t& args) {
-	while (args[0].to_boolean()) {
+	while (args[0].run().to_boolean()) {
 		args[1].run();
 	}
 
@@ -276,33 +291,28 @@ static Value while_(args_t& args) {
 
 // Runs the second value if the first is truthy. Otherwise, runs the third value.
 static Value if_(args_t& args) {
-	return args[0].to_boolean() ? args[1].run() : args[2].run();
+	return args[0].run().to_boolean() ? args[1].run() : args[2].run();
 }
 
 // Returns a substring of the first value, with the second value as the start index and the third as the length.
 //
 // If the length is out of bounds, it's assumed to be the string length.
 static Value get(args_t& args) {
-	auto str = args[0].to_string();
-	auto start = args[1].to_number();
-		auto length = args[2].to_number();
+	auto container = args[0].run();
+	auto start = args[1].run().to_number();
+	auto length = args[2].run().to_number();
 
-		if (start >= (number) str->length()) {
-			return Value(string());
-		}
-
-		return Value(str->substr(start, length));
-	}
+	return container.get(start, length);
+}
 
 // Returns a new string with first string's range `[second, second+third)` replaced by the fourth value.
 static Value substitute(args_t& args) {
-	auto str = args[0].to_string();
-	auto start = args[1].to_number();
-	auto length = args[2].to_number();
-	auto repl = args[3].to_string();
+	auto container = args[0].run();
+	auto start = args[1].run().to_number();
+	auto length = args[2].run().to_number();
+	auto replacement = args[3].run();
 
-	// this could be made more efficient by preallocating memory
-	return Value(str->substr(0, start) + *repl + str->substr(start + length));
+	return container.set(start, length, replacement);
 }
 
 
@@ -323,6 +333,10 @@ void Function::initialize(void) {
 	Function::register_function('D', 1, &::dump);
 	Function::register_function('O', 1, &::output);
 	Function::register_function('A', 1, &::ascii);
+	Function::register_function('~', 1, &::negate);
+	Function::register_function(',', 1, &::box);
+	Function::register_function('[', 1, &::head);
+	Function::register_function(']', 1, &::tail);
 
 	Function::register_function('+', 2, &::add);
 	Function::register_function('-', 2, &::sub);

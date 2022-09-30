@@ -35,10 +35,6 @@ std::optional<Value> Variable::parse(std::string_view& view) {
 	return std::make_optional<Value>(variable);
 }
 
-std::ostream& Variable::dump(std::ostream& out) const noexcept {
-	return out << "Variable(" << name << ")";
-}
-
 Value Variable::run() {
 	if (!value)
 		throw Error("unknown variable encountered: " + name);
