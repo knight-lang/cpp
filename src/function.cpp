@@ -8,16 +8,10 @@
 #include <iostream>
 #include <cstdio>
 
-using namespace kn;
+namespace kn {
 
 // The list of all _functions_
 static robin_hood::unordered_map<char, std::pair<funcptr_t, size_t>> FUNCTIONS;
-
-Function::Function(funcptr_t func, char name, args_t args) : func(func), name(name), args(args) { }
-
-Value Function::run() {
-	return func(args);
-}
 
 std::optional<Value> Function::parse(std::string_view& view) {
 	char front = view.front();
@@ -319,42 +313,44 @@ static Value substitute(args_t& args) {
 void Function::initialize(void) {
 	srand(time(NULL)); // seed `R`'s random number.
 
-	Function::register_function('P', 0, &::prompt);
-	Function::register_function('R', 0, &::random);
+	Function::register_function('P', 0, &prompt);
+	Function::register_function('R', 0, &random);
 
-	Function::register_function('B', 1, &::block);
-	Function::register_function('C', 1, &::call);
-	Function::register_function('E', 1, &::eval);
+	Function::register_function('B', 1, &block);
+	Function::register_function('C', 1, &call);
+	Function::register_function('E', 1, &eval);
 
-	Function::register_function('`', 1, &::system);
-	Function::register_function('Q', 1, &::quit);
-	Function::register_function('!', 1, &::not_);
-	Function::register_function('L', 1, &::length);
-	Function::register_function('D', 1, &::dump);
-	Function::register_function('O', 1, &::output);
-	Function::register_function('A', 1, &::ascii);
-	Function::register_function('~', 1, &::negate);
-	Function::register_function(',', 1, &::box);
-	Function::register_function('[', 1, &::head);
-	Function::register_function(']', 1, &::tail);
+	Function::register_function('`', 1, &system);
+	Function::register_function('Q', 1, &quit);
+	Function::register_function('!', 1, &not_);
+	Function::register_function('L', 1, &length);
+	Function::register_function('D', 1, &dump);
+	Function::register_function('O', 1, &output);
+	Function::register_function('A', 1, &ascii);
+	Function::register_function('~', 1, &negate);
+	Function::register_function(',', 1, &box);
+	Function::register_function('[', 1, &head);
+	Function::register_function(']', 1, &tail);
 
-	Function::register_function('+', 2, &::add);
-	Function::register_function('-', 2, &::sub);
-	Function::register_function('*', 2, &::mul);
-	Function::register_function('/', 2, &::div);
-	Function::register_function('%', 2, &::mod);
-	Function::register_function('^', 2, &::pow);
-	Function::register_function('?', 2, &::eql);
-	Function::register_function('<', 2, &::lth);
-	Function::register_function('>', 2, &::gth);
-	Function::register_function('&', 2, &::and_);
-	Function::register_function('|', 2, &::or_);
-	Function::register_function(';', 2, &::then);
-	Function::register_function('=', 2, &::assign);
-	Function::register_function('W', 2, &::while_);
+	Function::register_function('+', 2, &add);
+	Function::register_function('-', 2, &sub);
+	Function::register_function('*', 2, &mul);
+	Function::register_function('/', 2, &div);
+	Function::register_function('%', 2, &mod);
+	Function::register_function('^', 2, &pow);
+	Function::register_function('?', 2, &eql);
+	Function::register_function('<', 2, &lth);
+	Function::register_function('>', 2, &gth);
+	Function::register_function('&', 2, &and_);
+	Function::register_function('|', 2, &or_);
+	Function::register_function(';', 2, &then);
+	Function::register_function('=', 2, &assign);
+	Function::register_function('W', 2, &while_);
 
-	Function::register_function('I', 3, &::if_);
-	Function::register_function('G', 3, &::get);
+	Function::register_function('I', 3, &if_);
+	Function::register_function('G', 3, &get);
 
-	Function::register_function('S', 4, &::substitute);
+	Function::register_function('S', 4, &substitute);
 }
+
+} // namespace kn

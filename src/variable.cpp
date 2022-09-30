@@ -3,45 +3,26 @@
 #include <iostream>
 #include <memory>
 
-using namespace kn;
-
-Variable::Variable(std::string name) noexcept : name(name) {}
+namespace kn {
 
 // The set of all known variables.
-// note that variables last for the lifetime of the program, which is why we have pointers
+//
+// Yes globals are bad, and i probably shouldn't do this.
+// But it was quick and dirty and i don't take pride in my work
 static robin_hood::unordered_map<std::string_view, Variable*> ENVIRONMENT;
 
-std::optional<Value> Variable::parse(std::string_view& view) {
-	char front = view.front();
+Variable* Variable::lookup(std::string_view name) {
+	if (auto match = ENVIRONMENT.find(name); match != ENVIRONMENT.cend())
+		return match->second;
 
-	if (!std::islower(front) && front != '_')
-		return std::nullopt;
-
-	auto start = view.cbegin();
-
-	do {
-		view.remove_prefix(1);
-		front = view.front();
-	} while (std::islower(front) || front == '_' || std::isdigit(front));
-
-	auto identifier = std::string_view(start, view.cbegin() - start);
-
-	if (auto match = ENVIRONMENT.find(identifier); match != ENVIRONMENT.cend())
-		return std::make_optional<Value>(match->second);
-
-	auto variable = new Variable(std::string(identifier));
+	auto variable = new Variable(std::string(name));
 	ENVIRONMENT.emplace(std::string_view(variable->name), variable);
 
-	return std::make_optional<Value>(variable);
+	return variable;
 }
 
-Value Variable::run() {
-	if (!value)
-		throw Error("unknown variable encountered: " + name);
-
-	return *value;
+std::ostream& operator<<(std::ostream& out, Variable const& variable) {
+	return out << "Variable(" << variable.name << ")";
 }
 
-void Variable::assign(Value newvalue) noexcept {
-	value = std::move(newvalue);
-}
+} // namespace kn

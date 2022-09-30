@@ -4,18 +4,20 @@
 #include <iostream>
 
 namespace kn {
-	// Initializes the Knight interpreter. This must be run before all other types are.
-	void initialize();
 
-	// Runs the input as Knight source code, returning its result.
-	template<typename T>
-	Value run(T input) {
-		std::string_view view(input);
-		auto value = Value::parse(view);
+// Initializes the Knight interpreter. This must be run before all other types are.
+void initialize();
 
-		if (!value)
-			throw Error("cannot parse a value");
+// Runs the input as Knight source code, returning its result.
+template<typename T>
+Value run(T input) {
+	std::string_view view(input);
+	auto value = Value::parse(view);
 
-		return value->run();
-	}
+	if (!value)
+		throw Error("nothing to parse.");
+
+	return value->run();
 }
+
+} // namespace kn

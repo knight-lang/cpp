@@ -1,6 +1,10 @@
 #include "knight.hpp"
 #include "function.hpp"
 
-void kn::initialize() {
+namespace kn {
+
+void initialize() {
 	Function::initialize();
 }
+
+} // namespace kn

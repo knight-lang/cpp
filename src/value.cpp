@@ -4,18 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace kn;
-
-Value::Value() noexcept : data(null {}) {}
-Value::Value(bool boolean) noexcept : data(boolean) {}
-Value::Value(number num) noexcept : data(num) {}
-Value::Value(char chr) noexcept : Value(kn::make_shared<string>(1, chr)) {}
-Value::Value(string str) noexcept : Value(kn::make_shared<string>(str)) {}
-Value::Value(shared<string> str) noexcept : data(str) {}
-Value::Value(list lst) noexcept : Value(kn::make_shared<list>(lst)) {}
-Value::Value(shared<list> lst) noexcept : data(lst) {}
-Value::Value(Variable* var) noexcept : data(var) {}
-Value::Value(shared<Function> func) noexcept : data(func) {}
+namespace kn {
 
 static void remove_keyword(std::string_view& view) {
 	do {
@@ -27,6 +16,7 @@ std::optional<Value> Value::parse(std::string_view& view) {
 	char front;
 
 top:
+
 	if (view.empty())
 		return std::nullopt;
 
@@ -36,7 +26,7 @@ top:
 		do {
 			view.remove_prefix(1);
 		} while (!view.empty() && view.front() != '\n');
-		// fallthrough, as we know the first character is `\n`.
+		goto top; // Next character is either whitespace or we're at eof.
 
 	case ' ': case '\t': case '\n': case '\r': case '\v': case '\f':
 	case '(': case  ')': case ':': 
@@ -56,7 +46,7 @@ top:
 
 	case '@':
 		view.remove_prefix(1);
-		return std::make_optional<Value>(std::vector<Value>());
+		return std::make_optional<Value>(list());
 
 	case '\'':
 	case '\"': {
@@ -67,34 +57,43 @@ top:
 			if (view.empty())
 				throw Error("unmatched quote encountered!");
 
-		string ret(begin, view.cbegin());
+		string str(begin, view.cbegin());
 		view.remove_prefix(1);
 
-		return std::make_optional<Value>(ret);
+		return std::make_optional<Value>(str);
 	}
 
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9': {
 		number num = 0;
 
-		for (; std::isdigit(front = view.front()); view.remove_prefix(1)) {
+		for (; std::isdigit(front = view.front()); view.remove_prefix(1))
 			num = num * 10 + (front - '0');
-		}
 
 		return std::make_optional<Value>(num);
 	}
 
-	default:
-		if (auto var = Variable::parse(view))
-			return std::make_optional<Value>(*var);
+	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+	case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+	case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+	case 'v': case 'w': case 'x': case 'y': case 'z': case '_': {
+		auto start = view.cbegin();
 
+		do {
+			view.remove_prefix(1);
+		} while (std::islower(front = view.front()) || front == '_' || std::isdigit(front));
+
+		auto name = std::string_view(start, view.cbegin() - start);
+		return std::make_optional<Value>(Variable::lookup(name));
+	}
+
+	default:
 		if (auto func = Function::parse(view))
 			return std::make_optional<Value>(*func);
 
 		throw Error("invalid character encountered: " + std::to_string(front));
 	}
 }
-
 
 template <typename... Fns>
 struct overload : Fns... { using Fns::operator()...; };
@@ -143,7 +142,6 @@ number Value::to_number() const {
 	}, data);
 }
 
-
 static string join_list(list const& lst, std::string_view sep) {
 	string s;
 	bool start = true;
@@ -159,16 +157,13 @@ static string join_list(list const& lst, std::string_view sep) {
 }
 
 shared<string> Value::to_string() const {
+	static shared<string> null_string = kn::make_shared<string>("");
+	static shared<string> true_string = kn::make_shared<string>("true");
+	static shared<string> false_string = kn::make_shared<string>("false");
+
 	return std::visit(overload {
-		[](null) {
-			static shared<string> null_string = kn::make_shared<string>("");
-			return null_string;
-		},
-		[](bool boolean) {
-			static shared<string> true_string = kn::make_shared<string>("true");
-			static shared<string> false_string = kn::make_shared<string>("false");
-			return boolean ? true_string : false_string;
-		},
+		[](null) { return null_string; },
+		[](bool boolean) { return boolean ? true_string : false_string; },
 		[](number num) { return kn::make_shared<string>(std::to_string(num)); },
 		[](shared<string> const& str) { return str; },
 		[](shared<list> const& lst) { return kn::make_shared<string>(join_list(*lst, std::string_view("\n"))); },
@@ -208,8 +203,10 @@ shared<list> Value::to_list() const {
 
 			list lst;
 			lst.reserve(str->length());
+
 			for (auto chr : *str)
 				lst.push_back(Value(chr));
+
 			return kn::make_shared<list>(lst);
 		},
 		[](shared<list> const& lst) { return lst; },
@@ -217,7 +214,7 @@ shared<list> Value::to_list() const {
 	}, data);
 }
 
-std::ostream& Value::dump(std::ostream& out) const {
+std::ostream& operator<<(std::ostream& out, Value const& value) {
 	std::visit(overload {
 		[&](null) { out << "null"; }, 
 		[&](bool boolean) { out << (boolean ? "true" : "false"); },
@@ -235,6 +232,7 @@ std::ostream& Value::dump(std::ostream& out) const {
 				case '\"':
 					out << "\\";
 					[[fallthrough]];
+
 				default:
 					out << chr;
 				}
@@ -255,7 +253,7 @@ std::ostream& Value::dump(std::ostream& out) const {
 		},
 		[&](Variable* var) { out << *var; },
 		[&](shared<Function> const& func) { out << *func; },
-	}, data);
+	}, value.data);
 
 	return out;
 }
@@ -270,11 +268,12 @@ Variable *Value::as_variable() const {
 Value Value::to_ascii() const {
 	if (auto chr = std::get_if<number>(&data)) {
 		if (*chr <= '\0' || '~' < *chr) throw Error("number is not valid ascii");
-		return Value(string(1, *chr));
+		return Value(*chr);
 	}
 
 	if (auto str = std::get_if<shared<string>>(&data)) {
-		if (!(*str)->length()) throw Error("string is empty");
+		if (!(*str)->length())
+			throw Error("string is empty");
 		return Value((number) (**str)[0]);
 	}
 
@@ -423,34 +422,28 @@ Value Value::operator*(Value const& rhs) const {
 }
 
 Value Value::operator/(Value const& rhs) const {
-	number num;
+	if (auto lnum = std::get_if<number>(&data)) {
+		auto rnum = rhs.to_number();
 
-	if (auto pnum = std::get_if<number>(&data))
-		num = *pnum;
-	else
-		throw Error("invalid kind given to '/'");
+		if (!rnum)
+			throw new Error("Cannot divide by zero");
 
-	auto rnum = rhs.to_number();
+		return Value(*lnum / rnum);
+	}
 
-	if (!rnum)
-		throw new Error("Cannot divide by zero");
-
-	return Value(num / rnum);
+	throw Error("invalid kind given to '/'");
 }
 
 Value Value::operator%(Value const& rhs) const {
-	number num;
+	if (auto lnum = std::get_if<number>(&data)) {
+		auto rnum = rhs.to_number();
+		if (!rnum)
+			throw new Error("Cannot modulo by zero");
 
-	if (auto pnum = std::get_if<number>(&data))
-		num = *pnum;
-	else
-		throw Error("invalid kind given to '%'");
+		return Value(*lnum % rnum);
+	}
 
-	auto rnum = rhs.to_number();
-	if (!rnum)
-		throw new Error("Cannot modulo by zero");
-
-	return Value(num % rnum);
+	throw Error("invalid kind given to '%'");
 }
 
 Value Value::pow(Value const& rhs) const {
@@ -490,3 +483,6 @@ bool Value::operator>(Value const& rhs) const {
 		else throw Error("invalid kind given to '>'");
 	}, data);
 }
+
+} // namespace kn
+
