@@ -1,7 +1,7 @@
 #pragma once
 
 #include "value.hpp"
-#include "small_vector.hpp"
+#include "include/small_vector.hpp"
 
 namespace kn {
 

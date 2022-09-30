@@ -16,12 +16,12 @@ int main(int argc, char **argv) {
 
 	try {
 		if (std::string_view("-e") == argv[1])  {
-			kn::run(argv[2]);
+			kn::play(argv[2]);
 		} else if (std::string_view("-f") == argv[1]) {
 			std::ifstream file(argv[2]);
 			std::ostringstream contents;
 			contents << file.rdbuf();
-			kn::run(contents.str());
+			kn::play(contents.str());
 		} else {
 			usage(argv[0]);
 		}

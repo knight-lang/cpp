@@ -3,7 +3,7 @@
 #include "variable.hpp"
 #include "shared.hpp"
 #include "knight.hpp"
-#include "robin_hood_map.hpp"
+#include "include/robin_hood_map.hpp"
 
 #include <iostream>
 #include <cstdio>
@@ -81,7 +81,8 @@ static Value call(args_t& args) {
 
 // Evaluates the argument as Knight source code.
 static Value eval(args_t& args) {
-	return kn::run(*args[0].run().to_string());
+	auto code = args[0].run().to_string();
+	return kn::play(std::string_view(*code));
 }
 
 // Runs a shell command, returns the stdout of the command.

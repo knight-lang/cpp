@@ -9,15 +9,6 @@ namespace kn {
 void initialize();
 
 // Runs the input as Knight source code, returning its result.
-template<typename T>
-Value run(T input) {
-	std::string_view view(input);
-	auto value = Value::parse(view);
-
-	if (!value)
-		throw Error("nothing to parse.");
-
-	return value->run();
-}
+Value play(std::string_view view);
 
 } // namespace kn
