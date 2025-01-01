@@ -67,7 +67,7 @@ static Value prompt(args_t&) {
 	if (std::cin.eof() && line.length() == 0)
 		return Value();
 
-	while (line.length() != 0 && line.back() == '\r')
+	if (line.length() != 0 && line.back() == '\r')
 		line.pop_back();
 
 	return Value(line);
